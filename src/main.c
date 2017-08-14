@@ -370,7 +370,7 @@ for(int conf=0;conf< 10;conf++)
 
   //uint8_t	LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-   /* Start scheduler */
+  
   HAL_Delay(50);
 
 //  xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
@@ -378,6 +378,7 @@ for(int conf=0;conf< 10;conf++)
   xTaskCreate(Read_Temperature, "Read Temperature", 128, NULL, 1, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
 
+  /* Start scheduler */
   vTaskStartScheduler();
 
   /* We should never get here as control is now taken by the scheduler */
