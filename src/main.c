@@ -375,7 +375,7 @@ for(int conf=0;conf< 10;conf++)
 
 //  xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
 //  xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
-  xTaskCreate(Read_Temperature, "Read Temperature", 128, NULL, 1, NULL);
+  xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
 
   /* Start scheduler */
