@@ -84,7 +84,6 @@
 CAN_HandleTypeDef hcan;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
-
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
@@ -122,7 +121,7 @@ uint16_t CS_Pin[10]={CS1_Pin,CS2_Pin,CS3_Pin,CS4_Pin,CS5_Pin,CS6_Pin,CS7_Pin,CS8
 unsigned short int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 unsigned short int ResistanceValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 
-//Debug:
+//For Debug:
 unsigned long int count=0;
 
 /*SPI LEDs*/
@@ -376,8 +375,8 @@ for(int conf=0;conf< 10;conf++)
   
   HAL_Delay(50);
 
-//  xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
-//  xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
+  xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
+  //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
   xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
 
@@ -394,12 +393,13 @@ for(int conf=0;conf< 10;conf++)
    while (1)
   {
   		HAL_UART_Transmit(&huart1, (uint8_t*)"BlINK\n\r", strlen("BlINK\n\r"), 0xFFFF);
+
+  		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+		HAL_Delay(500);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
 		HAL_Delay(50);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-		HAL_Delay(50);
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-		HAL_Delay(50);
+		HAL_Delay(500);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
 
 	    vTaskDelay(pdMS_TO_TICKS(50));
@@ -425,6 +425,7 @@ void Read_Temperature(void *pvArgs) {
 
 
 for(;;) {
+    /*
     HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 0xFFFF);
 
 
@@ -435,25 +436,29 @@ for(;;) {
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
     HAL_Delay(5);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+    */
 
 /* USER CODE BEGIN 3 */
-	//for(int read= 9;read>=0;read--)
-    //{
-    //MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
-    //}
+	for(int read= 9;read>=0;read--)
+    {
+	//int read=1;
+	  MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
 
-    MAX31865_full_read(CS_GPIO_Port[4],CS_Pin[4],4,LEDinit,4);
-
-count++;
-	HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
-
-//check if light is still on
-if (*(LEDinit+(27-4*2)) == 0){
-	while (1){
+	count++;
+		HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
 		sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
-			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
-	}
-}
+					HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+	//check if light is still on
+
+//	if (*(LEDinit+(27-read*2)) == 0){
+//		while (1){
+//			sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
+//			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+//		}
+//	}
+
+    }
+
 	sprintf(Stop, "\n\rReading done\n\r");
 	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
