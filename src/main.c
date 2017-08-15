@@ -284,7 +284,7 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 	*(TemperatureValues_K+9-CSnumber)=(unsigned short int)tmp;
 	*(ResistanceValues_K+9-CSnumber)=(unsigned short int)resistanceRTD;
 
-	if(xQueueSend(Global_Queue_CS,*(TemperatureValues_K+9-CSnumber),200)){
+	if(xQueueSend(Global_Queue_CS, (TemperatureValues_K+9-CSnumber),200)){
 	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
 	  	 }
 	  	 else{
