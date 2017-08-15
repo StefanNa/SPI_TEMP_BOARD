@@ -423,13 +423,13 @@ for(int conf=0;conf< 10;conf++)
 
 }
 
-	void RecieveQueue(void *p){
+void RecieveQueue(void *p){
 		while(1){
 			for(int read= 9;read>=0;read--){
 		if(xQueueReceive(Global_Queue_CS, &receive,200)){
 					sprintf(Stop,"%hu\n\r",receive);
 					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
-					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("65000\n"), 0xFFFF);
+					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("65000\n\r"), 0xFFFF);
 
 		}
 				 else{
