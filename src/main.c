@@ -88,7 +88,7 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* Queue Handles -------------------------------------------------------------*/
-xQueueHandle Global_Queue_CS1 = 0;
+xQueueHandle Global_Queue_CS = 0;
 xQueueHandle Global_Queue_CS2 = 0;
 xQueueHandle Global_Queue_CS3 = 0;
 xQueueHandle Global_Queue_CS4 = 0;
@@ -134,7 +134,7 @@ GPIO_TypeDef* CS_GPIO_Port[10]={CS1_GPIO_Port, CS2_GPIO_Port,CS3_GPIO_Port,CS4_G
 uint16_t CS_Pin[10]={CS1_Pin,CS2_Pin,CS3_Pin,CS4_Pin,CS5_Pin,CS6_Pin,CS7_Pin,CS8_Pin,CS9_Pin,CS10_Pin};
 unsigned short int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 unsigned short int ResistanceValues_K[10]={0,0,0,0,0,0,0,0,0,0};
-
+unsigned short int receive;
 //For Debug:
 unsigned long int count=0;
 
@@ -163,7 +163,7 @@ void receive_task(void *pvArgs);
 void send_task(void *pvArgs);
 void Read_Temperature(void *pvArgs);
 void Blink(void *p);
-
+void RecieveQueue(void *p);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -284,13 +284,13 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 	*(TemperatureValues_K+9-CSnumber)=(unsigned short int)tmp;
 	*(ResistanceValues_K+9-CSnumber)=(unsigned short int)resistanceRTD;
 
-//	if(xQueueSend(Global_Queue_CS1,*(TemperatureValues_K+9-CSnumber),200)){
-//	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
-//	  	 }
-//	  	 else{
-//	    		HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to add to Queue\n\r", strlen("Failed to add to Queue\n\r"), 0xFFFF);
-//
-//	  	 }
+	if(xQueueSend(Global_Queue_CS,*(TemperatureValues_K+9-CSnumber),200)){
+	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
+	  	 }
+	  	 else{
+	    		HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to add to Queue\n\r", strlen("Failed to add to Queue\n\r"), 0xFFFF);
+
+	  	 }
 
 	sprintf(Trtd, "Temp in Array = %hu\n\r", TemperatureValues_K[9-CSnumber]);
 	    HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
@@ -394,7 +394,7 @@ for(int conf=0;conf< 10;conf++)
 
   //uint8_t	LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-  	 Global_Queue_CS1 = xQueueCreate(20,sizeof(unsigned int));
+  	 Global_Queue_CS = xQueueCreate(20,sizeof(unsigned int));
 //  	 Global_Queue_CS2 = xQueueCreate(3,sizeof(unsigned int));
 //  	 Global_Queue_CS3 = xQueueCreate(3,sizeof(unsigned int));
 //  	 Global_Queue_CS4 = xQueueCreate(3,sizeof(unsigned int));
@@ -411,6 +411,7 @@ for(int conf=0;conf< 10;conf++)
   //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
   xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
+  xTaskCreate(RecieveQueue, "RecieveQueue", 128, NULL, 1, NULL);
 
   /* Start scheduler */
   vTaskStartScheduler();
@@ -421,6 +422,24 @@ for(int conf=0;conf< 10;conf++)
   /* USER CODE BEGIN WHILE */
 
 }
+
+	void RecieveQueue(void *p){
+		while(1){
+			for(int read= 9;read>=0;read--){
+		if(xQueueReceive(Global_Queue_CS, &receive,200)){
+					sprintf(Stop,"%hu\n\r",receive);
+					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
+					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("65000\n"), 0xFFFF);
+
+		}
+				 else{
+						HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to add to Queue\n\r", strlen("Failed to add to Queue\n\r"), 0xFFFF);
+
+				  	 }
+			}
+			}
+	}
+
   void Blink(void *p){
    while (1)
   {
