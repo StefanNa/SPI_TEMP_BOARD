@@ -87,6 +87,20 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
+/* Queue Handles -------------------------------------------------------------*/
+xQueueHandle Global_Queue_CS1 = 0;
+xQueueHandle Global_Queue_CS2 = 0;
+xQueueHandle Global_Queue_CS3 = 0;
+xQueueHandle Global_Queue_CS4 = 0;
+xQueueHandle Global_Queue_CS5 = 0;
+xQueueHandle Global_Queue_CS6 = 0;
+xQueueHandle Global_Queue_CS7 = 0;
+xQueueHandle Global_Queue_CS8 = 0;
+xQueueHandle Global_Queue_CS9 = 0;
+xQueueHandle Global_Queue_CS10 = 0;
+
+
+
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 struct __attribute__((packed)) var_max31865
@@ -270,6 +284,14 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 	*(TemperatureValues_K+9-CSnumber)=(unsigned short int)tmp;
 	*(ResistanceValues_K+9-CSnumber)=(unsigned short int)resistanceRTD;
 
+//	if(xQueueSend(Global_Queue_CS1,*(TemperatureValues_K+9-CSnumber),200)){
+//	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
+//	  	 }
+//	  	 else{
+//	    		HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to add to Queue\n\r", strlen("Failed to add to Queue\n\r"), 0xFFFF);
+//
+//	  	 }
+
 	sprintf(Trtd, "Temp in Array = %hu\n\r", TemperatureValues_K[9-CSnumber]);
 	    HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 
@@ -372,10 +394,20 @@ for(int conf=0;conf< 10;conf++)
 
   //uint8_t	LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-  
-  HAL_Delay(50);
+  	 Global_Queue_CS1 = xQueueCreate(20,sizeof(unsigned int));
+//  	 Global_Queue_CS2 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS3 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS4 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS5 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS6 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS7 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS8 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS9 = xQueueCreate(3,sizeof(unsigned int));
+//  	 Global_Queue_CS10 = xQueueCreate(3,sizeof(unsigned int));
 
-  xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
+
+
+  //xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
   //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
   xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
