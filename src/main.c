@@ -122,6 +122,9 @@ uint16_t CS_Pin[10]={CS1_Pin,CS2_Pin,CS3_Pin,CS4_Pin,CS5_Pin,CS6_Pin,CS7_Pin,CS8
 unsigned short int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 unsigned short int ResistanceValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 
+//Debug:
+unsigned long int count=0;
+
 /*SPI LEDs*/
 uint8_t lightAllLeds [28] ={0x96, 0xDF, 0xFF, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF,0x20,0xFF};
 uint8_t lightNoLeds [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -392,14 +395,14 @@ for(int conf=0;conf< 10;conf++)
   {
   		HAL_UART_Transmit(&huart1, (uint8_t*)"BlINK\n\r", strlen("BlINK\n\r"), 0xFFFF);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-		HAL_Delay(500);
+		HAL_Delay(50);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-		HAL_Delay(500);
+		HAL_Delay(50);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-		HAL_Delay(500);
+		HAL_Delay(50);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
 
-	    vTaskDelay(pdMS_TO_TICKS(1000));
+	    vTaskDelay(pdMS_TO_TICKS(50));
 
 		/*
 		
@@ -426,27 +429,36 @@ for(;;) {
 
 
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-    HAL_Delay(50);
+    HAL_Delay(5);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-    HAL_Delay(50);
+    HAL_Delay(5);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-    HAL_Delay(50);
+    HAL_Delay(5);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
 
 /* USER CODE BEGIN 3 */
-	for(int read= 9;read>=0;read--)
-    {
+	//for(int read= 9;read>=0;read--)
+    //{
+    //MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
+    //}
 
-    MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
+    MAX31865_full_read(CS_GPIO_Port[4],CS_Pin[4],4,LEDinit,4);
 
-    }
+count++;
 	HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
 
+//check if light is still on
+if (*(LEDinit+(27-4*2)) == 0){
+	while (1){
+		sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
+			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+	}
+}
 	sprintf(Stop, "\n\rReading done\n\r");
 	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
 	//HAL_Delay(500);
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
@@ -624,7 +636,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
