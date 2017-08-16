@@ -440,15 +440,35 @@ void RecieveQueue(void *p){
 				 * ID will be sent as element 0 and the temperature as element 1. I believe it's
 				 * possible to simply use the code from CAN below or from my github, but you guys
 				 * will have to test that!
-				 * We might still have to mess around with timings. Possible even semaphores/mutexes.*/
+				 * We might still have to mess around with timings. Possible even semaphores/mutexes.
+				 * The below UART demo is just to demonstrate the concept, it can be deleted whenever.
+				 * It is marked with a start and end, and everything between them can be deleted
+				 * without further consequences. The demo messes a bit with the printing but not the
+				 * functionality it self, and when deleting the demo will restore the printing back
+				 * to normal. By changing the delay in this task from 50 to 15 and the delay in the
+				 * Read_Temperature task from 50 to 100 seems to fix the printing issue. When
+				 * deleting the UART CAN demo, changed these delays back(they are commented out).
+				 *
+				 * - Kristian */
 
+				/*START OF UART CAN DEMO*/
+				unsigned int id_to_send = hcan.pTxMsg->Data[0];
+				unsigned int temp_to_send = hcan.pTxMsg->Data[1];
+
+				char id_buff[1];
+				sprintf(id_buff, "CAN ID: %i\t", id_to_send);
+				HAL_UART_Transmit(&huart1, (uint8_t*)id_buff, strlen(id_buff), HAL_MAX_DELAY);
+				char temp_buff[1];
+				sprintf(temp_buff, "CAN Temperature: %i\n\r", temp_to_send);
+				HAL_UART_Transmit(&huart1, (uint8_t*)temp_buff, strlen(temp_buff), HAL_MAX_DELAY);
+				/*END OF UART CAN DEMO*/
 
 			} else {
 				HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
 			}
 		}
 
-		vTaskDelay(pdMS_TO_TICKS(50));
+		vTaskDelay(pdMS_TO_TICKS(/*50*/15));
 	}
 }
 
@@ -512,7 +532,7 @@ for(;;) {
 	sprintf(Stop, "\n\rReading done\n\r");
 	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
-	vTaskDelay(pdMS_TO_TICKS(50));
+	vTaskDelay(pdMS_TO_TICKS(/*50*/100));
   }
 }
 
@@ -550,8 +570,6 @@ void send_task(void *pvArgs) {
 	hcan.pTxMsg->Data[0] = 255;
 
 	while(1) {
-
-
 
 		TransmitReturn = HAL_CAN_Transmit(&hcan, 1000); //Try to transmit and get result
 
