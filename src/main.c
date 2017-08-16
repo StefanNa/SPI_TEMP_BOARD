@@ -391,7 +391,7 @@ for(int conf=0;conf< 10;conf++)
   //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
   xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
-  xTaskCreate(RecieveQueue, "RecieveQueue", 128, NULL, 1, NULL);
+  xTaskCreate(RecieveQueue, "RecieveQueue", 256, NULL, 1, NULL);
 
   /* Start scheduler */
   vTaskStartScheduler();
@@ -413,25 +413,35 @@ void RecieveQueue(void *p){
 				HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
 				HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
 
-				//Get ID
-				char cs_ID[1] = {0};
-				cs_ID[0] = Stop[0];
+				//Get ID and save it in an integer
+				char cs_ID_array[1] = {0};
+				unsigned int cs_ID = 0;
+				cs_ID_array[0] = Stop[0];
 
-				//Get temperature
-				char cs_temp[2] = {0};
-				cs_temp[0] = Stop[1];
-				cs_temp[1] = Stop[2];
+				sscanf(cs_ID_array, "%d", &cs_ID);
 
-				 /*Here we should send the values through can. It makes sense to do it just in this task.
+				//Get temperature and save it in an integer
+				char cs_temp_array[2] = {0};
+				unsigned int cs_temp = 0;
+				cs_temp_array[0] = Stop[1];
+				cs_temp_array[1] = Stop[2];
+
+				sscanf(cs_temp_array, "%d", &cs_temp);
+
+				//Prepare values to be sent through can
+				hcan.pTxMsg->Data[0] = cs_ID;
+				hcan.pTxMsg->Data[1] = cs_temp;
+
+				 /*Here we should send the values through can. It makes sense to do it in this task.
 				 *
-				 * We can unite the arrays above into one and send that, or we can send them separately.
-				 * If we want to send them separately, we will have to send twice.
-				 * This means that we might have to look into the timings of the task
-				 * since we have to make sure that there is enough time for the task to
-				 * send the value through can. This can be achieved through messing
-				 * around with the sleep time of the Read_temperature task.
-				 * If desired, these values can also be printed through UART easily since
-				 * they are char arrays. We might need to convert them to numbers for can though.*/
+				 * We can unite the arrays above into one and send that, or we can send them separately
+				 * I was mistaken in my comment from my last commit, we do not have to send twice.
+				 * The code above is able to send both the id and the temperature through CAN. The
+				 * ID will be sent as element 0 and the temperature as element 1. I believe it's
+				 * possible to simply use the code from CAN below or from my github, but you guys
+				 * will have to test that!
+				 * We might still have to mess around with timings. Possible even semaphores/mutexes.*/
+
 
 			} else {
 				HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
@@ -464,7 +474,6 @@ void Blink(void *p){
 /*FreeRTOS function definitions*/
 
 void Read_Temperature(void *pvArgs) {
-
 
 for(;;) {
     /*
