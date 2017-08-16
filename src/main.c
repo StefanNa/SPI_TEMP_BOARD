@@ -98,6 +98,7 @@ xQueueHandle Global_Queue_CS7 = 0;
 xQueueHandle Global_Queue_CS8 = 0;
 xQueueHandle Global_Queue_CS9 = 0;
 xQueueHandle Global_Queue_CS10 = 0;
+unsigned int receive;
 
 
 
@@ -118,6 +119,7 @@ uint8_t read_addr = 0x00; //Read address of Configuration register
 /*variables of resistance and temperature*/
 double resistanceRTD;
 double tmp;
+unsigned int ID_tmp;
 
 /*register to initiate SPI*/
 uint8_t config_reg_write[] = {WR(REG_CONFIG), 0xC2};
@@ -132,9 +134,9 @@ char *msg = "Initiating Temperature measurement\n\r";
 /*ChipSelect pins and ports*/
 GPIO_TypeDef* CS_GPIO_Port[10]={CS1_GPIO_Port, CS2_GPIO_Port,CS3_GPIO_Port,CS4_GPIO_Port,CS5_GPIO_Port,CS6_GPIO_Port,CS7_GPIO_Port,CS8_GPIO_Port,CS9_GPIO_Port,CS10_GPIO_Port};
 uint16_t CS_Pin[10]={CS1_Pin,CS2_Pin,CS3_Pin,CS4_Pin,CS5_Pin,CS6_Pin,CS7_Pin,CS8_Pin,CS9_Pin,CS10_Pin};
-unsigned short int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
+unsigned int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
+unsigned int Sensor_ID[10]={0xA0000, 0x90000,0x80000,0x70000,0x60000,0x50000,0x40000,0x30000,0x20000,0x10000};
 unsigned short int ResistanceValues_K[10]={0,0,0,0,0,0,0,0,0,0};
-unsigned short int receive;
 //For Debug:
 unsigned long int count=0;
 
@@ -260,8 +262,8 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 	    resistanceRTD = /*5143.92+*/((double)rtd_data.rtd_res_raw * RREF) / 32767; // Replace 4000 by 400 for PT100
 		sprintf(Rrtd, "\n\rCS%i: \n\rRrtd = %0.2f\n\rRAW = %u\n\r", CSnumber+1, resistanceRTD,rtd_data.rtd_res_raw);
 		HAL_UART_Transmit(&huart1, (uint8_t *)Rrtd, 60, TIMEOUT_VAL); // print RTD resistance
-	
-		//sprintf(Rrtd, "RAW = %u\n\r", rtd_data.rtd_res_raw);
+
+			//sprintf(Rrtd, "RAW = %u\n\r", rtd_data.rtd_res_raw);
 		//HAL_UART_Transmit(&huart1, (uint8_t *)Rrtd, 60, TIMEOUT_VAL); // print RTD resistance
 	
 	/* calculate RTD temperature (simple calc, +/- 2 deg C from -100C to 100C) */
@@ -274,17 +276,32 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 
 
 
-		sprintf(Trtd, "Trtd = %0.2f\n\r", tmp);
+	sprintf(Trtd, "Trtd = %0.2f\n\r", tmp);
     HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 	
     /*transferring kelvin with 2 decimals to unsigned 16 bit*/
 
     tmp=tmp*100;
 	resistanceRTD=resistanceRTD*100;
-	*(TemperatureValues_K+9-CSnumber)=(unsigned short int)tmp;
+	ID_tmp=(unsigned int)tmp;
+//	sprintf(Trtd, "ID = %i\n\r", ID_tmp);
+//	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
+
+	ID_tmp =ID_tmp | Sensor_ID[CSnumber];
+
+//	sprintf(Trtd, "s_ID = %i\n\r", Sensor_ID[CSnumber]);
+//	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
+
+//	sprintf(Trtd, "ID = %i\n\r", ID_tmp);
+//	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
+
+//	sprintf(Trtd, "IDTEMP = %i\n\r", ID_tmp);
+//	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
+
+	*(TemperatureValues_K+9-CSnumber)=ID_tmp;
 	*(ResistanceValues_K+9-CSnumber)=(unsigned short int)resistanceRTD;
 
-	if(xQueueSend(Global_Queue_CS, (TemperatureValues_K+9-CSnumber),200)){
+	if(xQueueSend(Global_Queue_CS, &ID_tmp,200)){
 	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
 	  	 }
 	  	 else{
@@ -292,7 +309,7 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 
 	  	 }
 
-	sprintf(Trtd, "Temp in Array = %hu\n\r", TemperatureValues_K[9-CSnumber]);
+	sprintf(Trtd, "Temp in Array = %i\n\r", TemperatureValues_K[9-CSnumber]);
 	    HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 
 	//HAL_Delay(200);
@@ -394,7 +411,7 @@ for(int conf=0;conf< 10;conf++)
 
   //uint8_t	LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-  	 Global_Queue_CS = xQueueCreate(20,sizeof(unsigned int));
+  	 Global_Queue_CS = xQueueCreate(10,sizeof(unsigned int));
 //  	 Global_Queue_CS2 = xQueueCreate(3,sizeof(unsigned int));
 //  	 Global_Queue_CS3 = xQueueCreate(3,sizeof(unsigned int));
 //  	 Global_Queue_CS4 = xQueueCreate(3,sizeof(unsigned int));
@@ -427,13 +444,13 @@ void RecieveQueue(void *p){
 		while(1){
 			for(int read= 9;read>=0;read--){
 		if(xQueueReceive(Global_Queue_CS, &receive,200)){
-					sprintf(Stop,"%hu\n\r",receive);
+					sprintf(Stop,"%x\n\r",receive);
 					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
-					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("65000\n\r"), 0xFFFF);
+					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
 
 		}
 				 else{
-						HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to add to Queue\n\r", strlen("Failed to add to Queue\n\r"), 0xFFFF);
+						HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
 
 				  	 }
 			}
