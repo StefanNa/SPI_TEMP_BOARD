@@ -404,27 +404,45 @@ for(int conf=0;conf< 10;conf++)
 }
 
 void RecieveQueue(void *p){
-		while(1){
-			for(int read= 9;read>=0;read--){
-		if(xQueueReceive(Global_Queue_CS, &receive,10)){
-			*(TemperatureValues_K+9-read)=receive;
+	while(1){
+		for(int read= 9;read>=0;read--){
+			if(xQueueReceive(Global_Queue_CS, &receive,10)){
+				*(TemperatureValues_K+9-read)=receive;
 
-					sprintf(Stop,"%x\n\r",receive);
-					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
-					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
+				sprintf(Stop,"%x\n\r",receive);
+				HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
+				HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
 
-		}
-				 else{
-						HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
+				//Get ID
+				char cs_ID[1] = {0};
+				cs_ID[0] = Stop[0];
 
-				  	 }
+				//Get temperature
+				char cs_temp[2] = {0};
+				cs_temp[0] = Stop[1];
+				cs_temp[1] = Stop[2];
+
+				 /*Here we should send the values through can. It makes sense to do it just in this task.
+				 *
+				 * We can unite the arrays above into one and send that, or we can send them separately.
+				 * If we want to send them separately, we will have to send twice.
+				 * This means that we might have to look into the timings of the task
+				 * since we have to make sure that there is enough time for the task to
+				 * send the value through can. This can be achieved through messing
+				 * around with the sleep time of the Read_temperature task.
+				 * If desired, these values can also be printed through UART easily since
+				 * they are char arrays. We might need to convert them to numbers for can though.*/
+
+			} else {
+				HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
 			}
-
-			vTaskDelay(pdMS_TO_TICKS(50));
 		}
-	}
 
-  void Blink(void *p){
+		vTaskDelay(pdMS_TO_TICKS(50));
+	}
+}
+
+void Blink(void *p){
    while (1)
   {
   		HAL_UART_Transmit(&huart1, (uint8_t*)"BlINK\n\r", strlen("BlINK\n\r"), 0xFFFF);
@@ -469,7 +487,7 @@ for(;;) {
 
 	count++;
 		sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
-					HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+		HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 	//check if light is still on
 
 	if (*(LEDinit+(27-read*2)) == 0){
