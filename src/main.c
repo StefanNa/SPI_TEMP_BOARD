@@ -89,15 +89,6 @@ UART_HandleTypeDef huart2;
 
 /* Queue Handles -------------------------------------------------------------*/
 xQueueHandle Global_Queue_CS = 0;
-xQueueHandle Global_Queue_CS2 = 0;
-xQueueHandle Global_Queue_CS3 = 0;
-xQueueHandle Global_Queue_CS4 = 0;
-xQueueHandle Global_Queue_CS5 = 0;
-xQueueHandle Global_Queue_CS6 = 0;
-xQueueHandle Global_Queue_CS7 = 0;
-xQueueHandle Global_Queue_CS8 = 0;
-xQueueHandle Global_Queue_CS9 = 0;
-xQueueHandle Global_Queue_CS10 = 0;
 unsigned int receive;
 
 
@@ -137,17 +128,16 @@ uint16_t CS_Pin[10]={CS1_Pin,CS2_Pin,CS3_Pin,CS4_Pin,CS5_Pin,CS6_Pin,CS7_Pin,CS8
 unsigned int TemperatureValues_K[10]={0,0,0,0,0,0,0,0,0,0};
 unsigned int Sensor_ID[10]={0xA0000, 0x90000,0x80000,0x70000,0x60000,0x50000,0x40000,0x30000,0x20000,0x10000};
 unsigned short int ResistanceValues_K[10]={0,0,0,0,0,0,0,0,0,0};
+
 //For Debug:
-unsigned long int count=0;
+unsigned long int count=0; //counts the runs of the program
 
 /*SPI LEDs*/
 uint8_t lightAllLeds [28] ={0x96, 0xDF, 0xFF, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF, 0x20, 0xFF,0x20,0xFF};
-uint8_t lightNoLeds [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-uint8_t LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; //also sequence fo all off
 
 
-		char MSG[30];
-		char debug[30];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -204,16 +194,16 @@ void configureSPI(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin)
   CS_DISABLE(CS_GPIO_Port, CS_Pin);
 }
 
-/* Function to unpack and store MAX31865 data */
+/* Function to unpack and store MAX31865 data, converti ti to ID,INT and send it to the queue */
 
 void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, uint8_t *LEDinit,int CSnumber)
 {
 	uint8_t read_data[8]={0,0,0,0,0,0,0,0}; //variable to store the contents of the registers
 
-	for(uint8_t reset=0;reset<8;reset++){
-		*(read_data+reset)=0; //variable to store the contents of the registers
-
-	}
+//	for(uint8_t reset=0;reset<8;reset++){
+//		*(read_data+reset)=0; //variable to store the contents of the registers
+//
+//	}
 	uint8_t i = 0; //loop variable
 	
 	// Step(1): Bring the CS pin low to activate the slave device
@@ -238,7 +228,6 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
     HAL_UART_Transmit(&huart1, (uint8_t *)SlaveOutput, 80, TIMEOUT_VAL);
 	
 	/*Enable LED if thermistor is connected*/
-	//LED=9-LED;
 	if (/*rtd_data.status >= 128||*/(rtd_data.rtd_res_raw < 32767 && rtd_data.rtd_res_raw > 0))
 		{
 	*(LEDinit+(27-LED*2))= 0xFF;
@@ -258,28 +247,27 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 		
   /* calculate RTD resistance */
 	//5143.92 as offset for 470k resistor
-	//CSnumber=CSnumber+1;
-	    resistanceRTD = /*5143.92+*/((double)rtd_data.rtd_res_raw * RREF) / 32767; // Replace 4000 by 400 for PT100
+	    resistanceRTD = /*Offset+*/((double)rtd_data.rtd_res_raw * RREF) / 32767; // Replace 4000 by 400 for PT100
 		sprintf(Rrtd, "\n\rCS%i: \n\rRrtd = %0.2f\n\rRAW = %u\n\r", CSnumber+1, resistanceRTD,rtd_data.rtd_res_raw);
 		HAL_UART_Transmit(&huart1, (uint8_t *)Rrtd, 60, TIMEOUT_VAL); // print RTD resistance
 
-			//sprintf(Rrtd, "RAW = %u\n\r", rtd_data.rtd_res_raw);
-		//HAL_UART_Transmit(&huart1, (uint8_t *)Rrtd, 60, TIMEOUT_VAL); // print RTD resistance
-	
 	/* calculate RTD temperature (simple calc, +/- 2 deg C from -100C to 100C) */
     /* CALCULATION OF TEMP MUST BE ADJUSTED TO RTD  */
-  //  tmp = ((double)rtd_data.rtd_res_raw / 32) - 256;
-	 tmp=1/(((log(/*(double)rtd_data.rtd_res_raw*/ resistanceRTD / 10000))/3435)+(1/298.15));
-	//tmp=tmp-273.15;
+
+		tmp=1/(((log(/*(double)rtd_data.rtd_res_raw*/ resistanceRTD / 10000))/3435)+(1/298.15));
+	//tmp=tmp-273.15; //for degrees celsius
+
+	/*sources:*/
 	// http://www.giangrandi.ch/electronics/ntc/ntc.shtml
-	//http://www.carelparts.com/manuals/ntc-specs.pdf page 8
+	// http://www.carelparts.com/manuals/ntc-specs.pdf page 8
 
 
 
 	sprintf(Trtd, "Trtd = %0.2f\n\r", tmp);
     HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 	
-    /*transferring kelvin with 2 decimals to unsigned 16 bit*/
+    /*transferring kelvin with 2 decimals to unsigned 32 bit
+     * adding the Sensor ID after as 1 byte before the data byte*/
 
     tmp=tmp*100;
 	resistanceRTD=resistanceRTD*100;
@@ -295,13 +283,10 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 //	sprintf(Trtd, "ID = %i\n\r", ID_tmp);
 //	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 
-//	sprintf(Trtd, "IDTEMP = %i\n\r", ID_tmp);
-//	HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
-
 	*(TemperatureValues_K+9-CSnumber)=ID_tmp;
 	*(ResistanceValues_K+9-CSnumber)=(unsigned short int)resistanceRTD;
 
-	if(xQueueSend(Global_Queue_CS, &ID_tmp,200)){
+	if(xQueueSend(Global_Queue_CS, &ID_tmp,10)){
 	   		HAL_UART_Transmit(&huart1, (uint8_t*)"Temperature in Queue\n\r", strlen("Temperature in Queue\n\r"), 0xFFFF);
 	  	 }
 	  	 else{
@@ -312,7 +297,6 @@ void MAX31865_full_read(GPIO_TypeDef* CS_GPIO_Port, uint16_t CS_Pin, int LED, ui
 	sprintf(Trtd, "Temp in Array = %i\n\r", TemperatureValues_K[9-CSnumber]);
 	    HAL_UART_Transmit(&huart1, (uint8_t *)Trtd, 60, TIMEOUT_VAL); // print RTD temperature
 
-	//HAL_Delay(200);
 }
 
 /* USER CODE END 0 */
@@ -365,7 +349,7 @@ int main(void)
 for(int conf=0;conf< 10;conf++)
 	{
 	configureSPI(CS_GPIO_Port[conf],CS_Pin[conf]);
-	//HAL_Delay(50);
+	HAL_Delay(50);
 
 	}
 	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\rConfiguration done\n\r", strlen("\n\rConfiguration done\n\r"), HAL_MAX_DELAY);
@@ -374,15 +358,6 @@ for(int conf=0;conf< 10;conf++)
   	HAL_SPI_Transmit(&hspi1, lightAllLeds, 28, 10);
   	HAL_Delay(1000);
 
-//  	for(int read= 9;read>=0;read--)
-//  	    {
-//  	    MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
-//
-//  	    }
-//  		HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
-//
-//  		sprintf(Stop, "\n\rReading done\n\r");
-//  		HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
   /* USER CODE END 2 */
 
@@ -409,20 +384,8 @@ for(int conf=0;conf< 10;conf++)
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
-  //uint8_t	LEDinit [28] ={0x96, 0xDF, 0xFF, 0xFF,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
   	 Global_Queue_CS = xQueueCreate(10,sizeof(unsigned int));
-//  	 Global_Queue_CS2 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS3 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS4 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS5 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS6 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS7 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS8 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS9 = xQueueCreate(3,sizeof(unsigned int));
-//  	 Global_Queue_CS10 = xQueueCreate(3,sizeof(unsigned int));
-
-
 
   //xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
   //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
@@ -443,7 +406,9 @@ for(int conf=0;conf< 10;conf++)
 void RecieveQueue(void *p){
 		while(1){
 			for(int read= 9;read>=0;read--){
-		if(xQueueReceive(Global_Queue_CS, &receive,200)){
+		if(xQueueReceive(Global_Queue_CS, &receive,10)){
+			*(TemperatureValues_K+9-read)=receive;
+
 					sprintf(Stop,"%x\n\r",receive);
 					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
 					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
@@ -454,7 +419,9 @@ void RecieveQueue(void *p){
 
 				  	 }
 			}
-			}
+
+			vTaskDelay(pdMS_TO_TICKS(50));
+		}
 	}
 
   void Blink(void *p){
@@ -472,18 +439,7 @@ void RecieveQueue(void *p){
 
 	    vTaskDelay(pdMS_TO_TICKS(50));
 
-		/*
-		
-	for(int read= 9;read>=0;read--)
-		{
-		MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
-		
-		}
-	//HAL_Delay(200);
-	sprintf(Stop, "\n\rReading done\n\r");
-	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
-	//HAL_Delay(200);
- */ }
+  }
 
 }
 
@@ -509,29 +465,27 @@ for(;;) {
 /* USER CODE BEGIN 3 */
 	for(int read= 9;read>=0;read--)
     {
-	//int read=1;
 	  MAX31865_full_read(CS_GPIO_Port[read],CS_Pin[read],read,LEDinit,read);
 
 	count++;
-		HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
 		sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
 					HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 	//check if light is still on
 
-//	if (*(LEDinit+(27-read*2)) == 0){
-//		while (1){
-//			sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
-//			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
-//		}
-//	}
+	if (*(LEDinit+(27-read*2)) == 0){
+		while (1){
+			sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
+			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+		}
+	}
 
     }
 
+	HAL_SPI_Transmit(&hspi1, LEDinit, 28, 10);
 	sprintf(Stop, "\n\rReading done\n\r");
 	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
-	//HAL_Delay(500);
-    vTaskDelay(pdMS_TO_TICKS(50));
+	vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
