@@ -387,11 +387,11 @@ for(int conf=0;conf< 10;conf++)
 
   	 Global_Queue_CS = xQueueCreate(10,sizeof(unsigned int));
 
-  //xTaskCreate(receive_task, "Receiver task", 128, NULL, 1, NULL);
+  xTaskCreate(receive_task, "Receiver task", 256, NULL, 1, NULL);
   //xTaskCreate(send_task, "Sender task", 128, NULL, 1, NULL);
   xTaskCreate(Read_Temperature, "Read Temperature", 256, NULL, 2, NULL);
   xTaskCreate(Blink, "Blink", 128, NULL, 1, NULL);
-  xTaskCreate(RecieveQueue, "RecieveQueue", 256, NULL, 1, NULL);
+  //xTaskCreate(RecieveQueue, "RecieveQueue", 256, NULL, 1, NULL);
 
   /* Start scheduler */
   vTaskStartScheduler();
@@ -404,75 +404,41 @@ for(int conf=0;conf< 10;conf++)
 }
 
 void RecieveQueue(void *p){
-	while(1){
-		for(int read= 9;read>=0;read--){
-			if(xQueueReceive(Global_Queue_CS, &receive,10)){
-				*(TemperatureValues_K+9-read)=receive;
 
-				sprintf(Stop,"%x\n\r",receive);
-				HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
-				HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
+	uint8_t Datatest[4];
 
-				//Get ID and save it in an integer
-				char cs_ID_array[1] = {0};
-				unsigned int cs_ID = 0;
-				cs_ID_array[0] = Stop[0];
+		while(1){
+			for(int read= 9;read>=0;read--){
+		if(xQueueReceive(Global_Queue_CS, &receive,10)){
+			//*(TemperatureValues_K+9-read)=receive;
+			TemperatureValues_K[9-read]=receive;
 
-				sscanf(cs_ID_array, "%d", &cs_ID);
+					sprintf(Stop,"%x\n\r",receive);
+					HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
+					HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
 
-				//Get temperature and save it in an integer
-				char cs_temp_array[2] = {0};
-				unsigned int cs_temp = 0;
-				cs_temp_array[0] = Stop[1];
-				cs_temp_array[1] = Stop[2];
-
-				sscanf(cs_temp_array, "%d", &cs_temp);
-
-				//Prepare values to be sent through can
-				hcan.pTxMsg->Data[0] = cs_ID;
-				hcan.pTxMsg->Data[1] = cs_temp;
-
-				 /*Here we should send the values through can. It makes sense to do it in this task.
-				 *
-				 * We can unite the arrays above into one and send that, or we can send them separately
-				 * I was mistaken in my comment from my last commit, we do not have to send twice.
-				 * The code above is able to send both the id and the temperature through CAN. The
-				 * ID will be sent as element 0 and the temperature as element 1. I believe it's
-				 * possible to simply use the code from CAN below or from my github, but you guys
-				 * will have to test that!
-				 * We might still have to mess around with timings. Possible even semaphores/mutexes.
-				 * The below UART demo is just to demonstrate the concept, it can be deleted whenever.
-				 * It is marked with a start and end, and everything between them can be deleted
-				 * without further consequences. The demo messes a bit with the printing but not the
-				 * functionality it self, and when deleting the demo will restore the printing back
-				 * to normal. By changing the delay in this task from 50 to 15 and the delay in the
-				 * Read_Temperature task from 50 to 100 seems to fix the printing issue. When
-				 * deleting the UART CAN demo, changed these delays back(they are commented out).
-				 *
-				 * - Kristian */
-
-				/*START OF UART CAN DEMO*/
-				unsigned int id_to_send = hcan.pTxMsg->Data[0];
-				unsigned int temp_to_send = hcan.pTxMsg->Data[1];
-
-				char id_buff[1];
-				sprintf(id_buff, "CAN ID: %i\t", id_to_send);
-				HAL_UART_Transmit(&huart1, (uint8_t*)id_buff, strlen(id_buff), HAL_MAX_DELAY);
-				char temp_buff[1];
-				sprintf(temp_buff, "CAN Temperature: %i\n\r", temp_to_send);
-				HAL_UART_Transmit(&huart1, (uint8_t*)temp_buff, strlen(temp_buff), HAL_MAX_DELAY);
-				/*END OF UART CAN DEMO*/
-
-			} else {
-				HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
-			}
 		}
+				 else{
+						HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
 
-		vTaskDelay(pdMS_TO_TICKS(/*50*/15));
+				  	 }
+			}
+
+			for (int m = 0; m < 10; m = m + 1){
+
+
+								Datatest[0] = 00;
+								Datatest[1] = TemperatureValues_K[m] >> 16;
+								Datatest[2] = TemperatureValues_K[m] >> 8;
+								Datatest[3] = TemperatureValues_K[m];
+								sprintf(Stop,"%02X %02X %02X %02X\n\r",Datatest[0],Datatest[1],Datatest[2],Datatest[3]);
+								HAL_UART_Transmit(&huart1, (uint8_t*)Stop, 20, 0xFFFF);
+			}
+			vTaskDelay(pdMS_TO_TICKS(/*50*/15));
+		}
 	}
-}
 
-void Blink(void *p){
+  void Blink(void *p){
    while (1)
   {
   		HAL_UART_Transmit(&huart1, (uint8_t*)"BlINK\n\r", strlen("BlINK\n\r"), 0xFFFF);
@@ -485,7 +451,7 @@ void Blink(void *p){
 		HAL_Delay(500);
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
 
-	    vTaskDelay(pdMS_TO_TICKS(50));
+		vTaskDelay(pdMS_TO_TICKS(/*50*/100));
 
   }
 
@@ -494,6 +460,7 @@ void Blink(void *p){
 /*FreeRTOS function definitions*/
 
 void Read_Temperature(void *pvArgs) {
+
 
 for(;;) {
     /*
@@ -516,15 +483,15 @@ for(;;) {
 
 	count++;
 		sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
-		HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+					HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 	//check if light is still on
 
-	if (*(LEDinit+(27-read*2)) == 0){
-		while (1){
-			sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
-			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
-		}
-	}
+//	if (*(LEDinit+(27-read*2)) == 0){
+//		while (1){
+//			sprintf(Stop, "\n\rRUNS: %lu\n\r",count);
+//			HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
+//		}
+//	}
 
     }
 
@@ -532,34 +499,123 @@ for(;;) {
 	sprintf(Stop, "\n\rReading done\n\r");
 	HAL_UART_Transmit(&huart1, (uint8_t *)Stop, 30, TIMEOUT_VAL);
 
-	vTaskDelay(pdMS_TO_TICKS(/*50*/100));
+	vTaskDelay(pdMS_TO_TICKS(17));
   }
 }
 
 void receive_task(void *pvArgs) {
 
-	uint8_t data_holder;
+		uint8_t data_holder;
+		uint8_t data_to_send;
+		uint8_t ok_to_send;
+		HAL_StatusTypeDef TransmitReturn;
 
-	while(1) {
+		for(;;) {
 
-		HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
-  		if(HAL_CAN_Receive(&hcan, CAN_FIFO0, 1000) != HAL_OK) { //Try to receive
+			for(int read= 9;read>=0;read--)
+			{
+					if(xQueueReceive(Global_Queue_CS, &receive,10)){
+						//*(TemperatureValues_K+9-read)=receive;
+						TemperatureValues_K[9-read]=receive;
 
-  			HAL_UART_Transmit(&huart1, (uint8_t *)"Receiving error", strlen("Receiving error"), HAL_MAX_DELAY);
-  			HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+								sprintf(Stop,"%x\n\r",receive);
+								HAL_UART_Transmit(&huart1, (uint8_t*)"CS:\t", strlen("CS:\t"), 0xFFFF);
+								HAL_UART_Transmit(&huart1, (uint8_t*)Stop, strlen("690000\n\r"), 0xFFFF);
 
-  		} else { //Succes!
+					}
+					else{
+									HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to read from Queue\n\r", strlen("Failed to read from Queue\n\r"), 0xFFFF);
 
-  			data_holder = hcan.pRxMsg->Data[0];
-  			char buff[20];
-  			sprintf(buff, "%i", data_holder);
-  			HAL_UART_Transmit(&huart1, (uint8_t*)"Receiving: ", strlen("Receiving: "), HAL_MAX_DELAY);
-  			HAL_UART_Transmit(&huart1, (uint8_t*)buff, strlen(buff), HAL_MAX_DELAY);
-  			HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
-  		}
+					}
+			}
 
-  		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
+			HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+	  		if(HAL_CAN_Receive(&hcan, CAN_FIFO0, 1000) != HAL_OK) { //Try to receive
+
+	  			HAL_UART_Transmit(&huart1, (uint8_t *)"Receiving error!!", strlen("Receiving error!!"), HAL_MAX_DELAY);
+	  			HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  		} else { //Succes!
+
+	  			data_holder = hcan.pRxMsg->Data[0];
+	  			//char buff[20];
+	  			if(data_holder == 255){
+	  				ok_to_send = 255;
+	  			}
+	  			else if( data_holder == 0xAA){
+	  				ok_to_send = 0;
+	  			}
+	  			while (ok_to_send == 255) {
+
+	  				int m;
+					for (m = 0; m < 10; m = m + 1){
+					hcan.pTxMsg->Data[0] = 01;
+					hcan.pTxMsg->Data[1] = TemperatureValues_K[m] >> 16;
+					hcan.pTxMsg->Data[2] = TemperatureValues_K[m] >> 8;
+					hcan.pTxMsg->Data[3] = TemperatureValues_K[m];
+
+/*
+	  				int m;
+	  				for (m = 1; m < 11; m = m + 1){
+	  				hcan.pTxMsg->Data[0] = 00;
+	  				hcan.pTxMsg->Data[1] = m;
+	  				hcan.pTxMsg->Data[2] = 0x01;
+	  				hcan.pTxMsg->Data[3] = m;
+*/
+	  				HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+	  		  		if(HAL_CAN_Receive(&hcan, CAN_FIFO0, 5) != HAL_OK) { //Try to receive
+
+	  		  			HAL_UART_Transmit(&huart1, (uint8_t *)"Receiving error", strlen("Receiving error"), HAL_MAX_DELAY);
+	  		  			HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  		  		} else {
+	  	  			data_holder = hcan.pRxMsg->Data[0];
+	  	  			//char buff[20];
+	  	  			if(data_holder == 255){
+	  	  				ok_to_send = 255;
+	  	  			}
+	  	  			else if( data_holder == 0xAA){
+	  	  				ok_to_send = 0;
+	  	  				break;
+	  	  			}
+	  				//vTaskDelay(pdMS_TO_TICKS(100));
+	  		  		}
+
+	  				TransmitReturn = HAL_CAN_Transmit(&hcan, 5); //Try to transmit and get result
+
+	  				if (TransmitReturn == HAL_ERROR) { //We got an error
+	  				  	/* Transmitting Error */
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"Failed to transmit", strlen("Failed to receive"), HAL_MAX_DELAY);
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  				} else if((TransmitReturn == HAL_TIMEOUT)){ //Timed out
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"Timeout", strlen("Timeout"), HAL_MAX_DELAY);
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  				} else if((TransmitReturn == HAL_OK)){ //Everything worked
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"Transmitting: ", strlen("Transmitting: "), HAL_MAX_DELAY);
+
+	  				  	data_to_send = hcan.pTxMsg->Data[3];
+
+	  				  	char trans_buff[20];
+	  				  	sprintf(trans_buff, "%i", data_to_send);
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)trans_buff, strlen(trans_buff), HAL_MAX_DELAY);
+	  				  	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  				}
+	  			    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+
+	  				}
+
+	  			}
+	  			//sprintf(buff, "%i", data_holder);
+	  		//	HAL_UART_Transmit(&huart1, (uint8_t*)"Receiving: ", strlen("Receiving: "), HAL_MAX_DELAY);
+	  		//	HAL_UART_Transmit(&huart1, (uint8_t*)buff, strlen(buff), HAL_MAX_DELAY);
+	  		//	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\r", strlen("\n\r"), HAL_MAX_DELAY);
+
+	  		}
+	  		vTaskDelay(pdMS_TO_TICKS(15));
+		}
 }
 
 void send_task(void *pvArgs) {
@@ -570,6 +626,8 @@ void send_task(void *pvArgs) {
 	hcan.pTxMsg->Data[0] = 255;
 
 	while(1) {
+
+
 
 		TransmitReturn = HAL_CAN_Transmit(&hcan, 1000); //Try to transmit and get result
 
@@ -671,7 +729,7 @@ static void MX_CAN_Init(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-  hcan.pTxMsg->StdId = 0x021;
+  hcan.pTxMsg->StdId = 0x065;
   hcan.pTxMsg->IDE   = CAN_ID_STD;//values defined in different hal libraries
   hcan.pTxMsg->RTR   = CAN_RTR_DATA;//values defined in different hal libraries
   hcan.pTxMsg->DLC   = 2;//1-9
